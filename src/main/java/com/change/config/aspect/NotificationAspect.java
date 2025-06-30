@@ -26,9 +26,7 @@ public class NotificationAspect {
 
     try {
       if (savedChange.isCritical()) {
-        CompletableFuture.runAsync(() -> {
-          notificationService.notifyCriticalChange(savedChange);
-        });
+        CompletableFuture.runAsync(() -> notificationService.notifyCriticalChange(savedChange));
       }
     } catch (Exception e) {
       log.error("Fail to send notification about critical update", e);
