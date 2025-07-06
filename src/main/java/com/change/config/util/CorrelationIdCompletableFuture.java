@@ -1,7 +1,6 @@
 package com.change.config.util;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
