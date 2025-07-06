@@ -33,7 +33,7 @@ class ConfigChangeServiceImplTest {
         .key("app.feature.enabled")
         .value("true")
         .type(ConfigChangeType.ADD)
-        .description("Enable new feature")
+        .note("Enable new feature")
         .critical(true)
         .build();
 
@@ -48,7 +48,7 @@ class ConfigChangeServiceImplTest {
     assertEquals(inputChange.getKey(), result.getKey());
     assertEquals(inputChange.getValue(), result.getValue());
     assertEquals(inputChange.getType(), result.getType());
-    assertEquals(inputChange.getDescription(), result.getDescription());
+    assertEquals(inputChange.getNote(), result.getNote());
     assertEquals(inputChange.isCritical(), result.isCritical());
   }
 

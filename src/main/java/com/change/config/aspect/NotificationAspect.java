@@ -2,6 +2,7 @@ package com.change.config.aspect;
 
 import com.change.config.model.ConfigChange;
 import com.change.config.service.NotificationService;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,14 +23,17 @@ public class NotificationAspect {
       returning = "savedChange"
   )
   public void notifyCriticalUpdate(ConfigChange savedChange) {
-    System.out.println("saved: " + savedChange);
-
     try {
-      if (savedChange.isCritical()) {
+      if (isShouldNotify(savedChange)) {
+        log.info("Should notify about : {}", savedChange);
         CompletableFuture.runAsync(() -> notificationService.notifyCriticalChange(savedChange));
       }
     } catch (Exception e) {
       log.error("Fail to send notification about critical update", e);
     }
+  }
+
+  private boolean isShouldNotify(ConfigChange savedChange) {
+    return Optional.ofNullable(savedChange).map(ConfigChange::isCritical).orElse(false);
   }
 }

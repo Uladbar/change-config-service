@@ -3,6 +3,8 @@ package com.change.config.service.impl;
 import com.change.config.model.ConfigChange;
 import com.change.config.service.NotificationService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 
 /**
@@ -12,11 +14,13 @@ import org.springframework.stereotype.Service;
 @Service
 public class NotificationServiceImpl implements NotificationService {
 
+  @Retryable(maxAttemptsExpression = "${notification.retry.max-attempts}",
+      backoff = @Backoff(delayExpression = "${notification.retry.delay}"))
   @Override
   public void notifyCriticalChange(ConfigChange configChange) {
     // Log the critical change
-    log.warn("CRITICAL CONFIGURATION CHANGE: {} - Key: {}, Value: {}, Type: {}",
-        configChange.getDescription(),
+    log.warn("CRITICAL CONFIGURATION CHANGE: Note: {}, Key: {}, Value: {}, Type: {}",
+        configChange.getNote(),
         configChange.getKey(),
         configChange.getValue(),
         configChange.getType());

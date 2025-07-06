@@ -25,7 +25,7 @@ public class ConfigChangeResponseDto {
     
     private String value;
     
-    private String description;
+    private String note;
     
     private boolean critical;
     

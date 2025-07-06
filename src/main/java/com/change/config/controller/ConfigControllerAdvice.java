@@ -4,11 +4,14 @@ import com.change.config.exception.ConfigChangeNotFoundException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.validation.beanvalidation.SpringValidatorAdapter;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -25,15 +28,14 @@ public class ConfigControllerAdvice {
    * @return Map of field errors
    */
   @ExceptionHandler(MethodArgumentNotValidException.class)
-  public ResponseEntity<Map<String, Map<String, String>>> handleValidationExceptions(MethodArgumentNotValidException ex) {
-    Map<String, String> errors = new HashMap<>();
+  public ResponseEntity<Map<String, Set<String>>> handleValidationExceptions(MethodArgumentNotValidException ex) {
+    Set<String> errors = new HashSet<>();
     ex.getBindingResult().getAllErrors().forEach(error -> {
-      String fieldName = ((FieldError) error).getField();
       String errorMessage = error.getDefaultMessage();
-      errors.put(fieldName, errorMessage);
+      errors.add(errorMessage);
     });
 
-    Map<String, Map<String, String>> response = new HashMap<>();
+    Map<String, Set<String>> response = new HashMap<>();
     response.put("errors", errors);
     return ResponseEntity.badRequest().body(response);
   }

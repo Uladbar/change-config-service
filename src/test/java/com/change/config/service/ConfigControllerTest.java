@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -65,12 +66,12 @@ public class ConfigControllerTest {
 
 
   @Test
-  public void testCreateConfigChange_Success() throws Exception {
+  public void createConfigChange_success() throws Exception {
     ConfigChangeRequestDto requestDto = ConfigChangeRequestDto.builder()
         .type(ConfigChangeType.ADD)
         .key("credit.limit")
         .value("5000")
-        .description("Set credit limit")
+        .note("Set credit limit")
         .critical(false)
         .build();
 
@@ -82,7 +83,7 @@ public class ConfigControllerTest {
         .andExpect(jsonPath("$.type").value(requestDto.getType().toString()))
         .andExpect(jsonPath("$.key").value(requestDto.getKey()))
         .andExpect(jsonPath("$.value").value(requestDto.getValue()))
-        .andExpect(jsonPath("$.description").value(requestDto.getDescription()))
+        .andExpect(jsonPath("$.note").value(requestDto.getNote()))
         .andExpect(jsonPath("$.critical").value(requestDto.isCritical()))
         .andExpect(jsonPath("$.timestamp").exists());
 
@@ -93,12 +94,60 @@ public class ConfigControllerTest {
   }
 
   @Test
-  public void testCreateConfigChange_WithCriticalChange_ShouldNotify() throws Exception {
+  public void createDeleteConfigChange_withoutValue_success() throws Exception {
+    ConfigChangeRequestDto requestDto = ConfigChangeRequestDto.builder()
+        .type(ConfigChangeType.DELETE)
+        .key("credit.limit")
+        .note("Set credit limit")
+        .critical(false)
+        .build();
+
+    mockMvc.perform(post("/api/configs")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(requestDto)))
+        .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.id").exists())
+        .andExpect(jsonPath("$.type").value(requestDto.getType().toString()))
+        .andExpect(jsonPath("$.key").value(requestDto.getKey()))
+        .andExpect(jsonPath("$.value").value(requestDto.getValue()))
+        .andExpect(jsonPath("$.note").value(requestDto.getNote()))
+        .andExpect(jsonPath("$.critical").value(requestDto.isCritical()))
+        .andExpect(jsonPath("$.timestamp").exists());
+
+    verify(configChangeMapper).toEntity(any(ConfigChangeRequestDto.class));
+    verify(configChangeService).createConfigChange(any(ConfigChange.class));
+    verify(configChangeMapper).toDto(any(ConfigChange.class));
+    verify(notificationService, never()).notifyCriticalChange(any(ConfigChange.class));
+  }
+
+  @Test
+  public void createDeleteConfigChange_WithValue_ShouldFail() throws Exception {
+    ConfigChangeRequestDto requestDto = ConfigChangeRequestDto.builder()
+        .type(ConfigChangeType.DELETE)
+        .key("credit.limit")
+        .value("5000")
+        .note("Set credit limit")
+        .critical(false)
+        .build();
+
+    mockMvc.perform(post("/api/configs")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(requestDto)))
+        .andExpect(status().isBadRequest());
+
+    verifyNoInteractions(configChangeMapper);
+    verifyNoInteractions(configChangeService);
+    verifyNoInteractions(configChangeMapper);
+    verifyNoInteractions(notificationService);
+  }
+
+  @Test
+  public void createConfigChange_WithCriticalChange_ShouldNotify() throws Exception {
     ConfigChangeRequestDto requestDto = ConfigChangeRequestDto.builder()
         .type(ConfigChangeType.UPDATE)
         .key("approval.policy")
         .value("strict")
-        .description("Changed approval policy to strict")
+        .note("Changed approval policy to strict")
         .critical(true)
         .build();
 
@@ -121,14 +170,15 @@ public class ConfigControllerTest {
 
 
   @Test
-  public void testCreateConfigChange_NotificationError_ShouldSave() throws Exception {
+  public void createConfigChange_NotificationException_ShouldSave() throws Exception {
     ConfigChangeRequestDto requestDto = ConfigChangeRequestDto.builder()
         .type(ConfigChangeType.UPDATE)
         .key("approval.policy")
         .value("strict")
-        .description("Changed approval policy to strict")
+        .note("Changed approval policy to strict")
         .critical(true)
         .build();
+
     Mockito.doThrow(RuntimeException.class).when(notificationService).notifyCriticalChange(any(ConfigChange.class));
 
     mockMvc.perform(post("/api/configs")
@@ -145,10 +195,11 @@ public class ConfigControllerTest {
 
     var saved = configChangeRepository.findById(argCapture.getValue().getId());
     assertNotNull(saved);
+    verify(notificationService).notifyCriticalChange(argCapture.getValue());
   }
 
   @Test
-  public void testCreateConfigChange_MissingRequiredFields() throws Exception {
+  public void createConfigChange_MissingRequiredFields() throws Exception {
     // Missing type, key, and value which are required
     ConfigChangeRequestDto requestDto = ConfigChangeRequestDto.builder().build();
 
@@ -163,8 +214,13 @@ public class ConfigControllerTest {
   }
 
   @Test
-  public void testCreateConfigChange_InvalidType() throws Exception {
-    String invalidRequest = "{\"type\":\"INVALID_TYPE\",\"key\":\"credit.limit\",\"value\":\"5000\"}";
+  public void createConfigChange_InvalidType() throws Exception {
+    String invalidRequest = """
+        { "type":"INVALID_TYPE",
+          "key":"credit.limit",
+          "value":"5000"
+        }
+        """;
 
     mockMvc.perform(post("/api/configs")
             .contentType(MediaType.APPLICATION_JSON)
@@ -177,8 +233,8 @@ public class ConfigControllerTest {
   }
 
   @ParameterizedTest
-  @MethodSource("params")
-  public void testGetConfigChanges(FilterDto filterDto, List<ConfigChange> allChanges, List<ConfigChange> expectedResult) throws Exception {
+  @MethodSource("getFilterParametersArguments")
+  public void getConfigChanges(FilterDto filterDto, List<ConfigChange> allChanges, List<ConfigChange> expectedResult) throws Exception {
 
     Mockito.when(configChangeRepository.findAll()).thenReturn(allChanges);
     var requestBuilder = get("/api/configs");
@@ -205,7 +261,7 @@ public class ConfigControllerTest {
     verify(configChangeService, never()).createConfigChange(any(ConfigChange.class));
   }
 
-  public static Stream<Arguments> params() {
+  public static Stream<Arguments> getFilterParametersArguments() {
     var changeA = ConfigChange.builder()
         .type(ConfigChangeType.UPDATE)
         .timestamp(LocalDateTime.now().minusDays(3))
@@ -252,12 +308,12 @@ public class ConfigControllerTest {
   }
 
   @Test
-  public void testGetConfigChangeById() throws Exception {
+  public void getConfigChangeById() throws Exception {
     var id = "unique id";
     var expected = ConfigChangeResponseDto.builder()
         .id(id)
         .critical(true)
-        .description("Changed description")
+        .note("Changed description")
         .timestamp(LocalDateTime.now())
         .key("approval.policy")
         .value("strict")
@@ -270,7 +326,7 @@ public class ConfigControllerTest {
             .timestamp(expected.getTimestamp())
             .key(expected.getKey())
             .value(expected.getValue())
-            .description(expected.getDescription())
+            .note(expected.getNote())
             .critical(expected.isCritical())
             .build());
     mockMvc.perform(get("/api/configs/" + id)

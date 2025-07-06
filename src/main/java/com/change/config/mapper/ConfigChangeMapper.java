@@ -20,7 +20,7 @@ public class ConfigChangeMapper {
         .type(requestDto.getType())
         .key(requestDto.getKey())
         .value(requestDto.getValue())
-        .description(requestDto.getDescription())
+        .note(requestDto.getNote())
         .critical(requestDto.isCritical())
         .build();
   }
@@ -35,7 +35,7 @@ public class ConfigChangeMapper {
         .type(entity.getType())
         .key(entity.getKey())
         .value(entity.getValue())
-        .description(entity.getDescription())
+        .note(entity.getNote())
         .critical(entity.isCritical())
         .timestamp(entity.getTimestamp())
         .build();
