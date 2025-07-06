@@ -1,6 +1,5 @@
-package com.change.config.controller;
+package com.change.config.exception;
 
-import com.change.config.exception.ConfigChangeNotFoundException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -10,12 +9,9 @@ import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.validation.FieldError;
-import org.springframework.validation.beanvalidation.SpringValidatorAdapter;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 @Slf4j
 @ControllerAdvice
@@ -54,26 +50,9 @@ public class ConfigControllerAdvice {
     return ResponseEntity.badRequest().body(response);
   }
 
-  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-  public ResponseEntity<Map<String, String>> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
-    Map<String, String> response = new HashMap<>();
-    if (ex.getRequiredType() != null && ex.getRequiredType().isEnum()) {
-      Class<?> enumType = ex.getRequiredType();
-      Object[] enumConstants = enumType.getEnumConstants();
-      response.put("errors", "Invalid value '%s' for parameter '%s'. Allowed values are: %s.".formatted(
-          ex.getValue(),
-          ex.getName(),
-          Arrays.toString(enumConstants)
-      ));
-    } else {
-      response.put("errors", "Invalid value '%s' for parameter '%s'".formatted(ex.getValue(), ex.getName()));
-    }
-    return ResponseEntity.badRequest().body(response);
-  }
-
   @ExceptionHandler(ConfigChangeNotFoundException.class)
-  public ResponseEntity<Map<String, String>> handleValidationExceptions(ConfigChangeNotFoundException ex) {
-    log.info(ex.getMessage());
+  public ResponseEntity<Map<String, String>> handleConfigChangeNotFoundException(ConfigChangeNotFoundException ex) {
+    log.info(ex.getMessage(), ex);
     return ResponseEntity.notFound().build();
   }
 }

@@ -1,6 +1,6 @@
 package com.change.config.service;
 
-import com.change.config.dto.FilterDto;
+import com.change.config.dto.ConfigChangeFilterDto;
 import com.change.config.model.ConfigChange;
 import java.util.List;
 
@@ -31,5 +31,5 @@ public interface ConfigChangeService {
    * @param filterDto Container for filter params
    * @return List of configuration changes within the time range
    */
-  List<ConfigChange> getConfigChangesByFilter(FilterDto filterDto);
+  List<ConfigChange> getConfigChangesByFilter(ConfigChangeFilterDto filterDto);
 }

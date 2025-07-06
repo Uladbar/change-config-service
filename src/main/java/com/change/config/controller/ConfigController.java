@@ -2,7 +2,7 @@ package com.change.config.controller;
 
 import com.change.config.dto.ConfigChangeRequestDto;
 import com.change.config.dto.ConfigChangeResponseDto;
-import com.change.config.dto.FilterDto;
+import com.change.config.dto.ConfigChangeFilterDto;
 import com.change.config.mapper.ConfigChangeMapper;
 import com.change.config.model.ConfigChange;
 import com.change.config.service.ConfigChangeService;
@@ -14,7 +14,6 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.net.URI;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -68,22 +67,17 @@ public class ConfigController {
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
   public ResponseEntity<ConfigChangeResponseDto> createConfigChange(
-      @Parameter(description = "Configuration change details", required = true)
       @Valid @RequestBody ConfigChangeRequestDto requestDto) {
-    ConfigChange configChange = configChangeMapper.toEntity(requestDto);
 
-    ConfigChange savedChange = configChangeService.createConfigChange(configChange);
+    ConfigChange savedChange = configChangeService.createConfigChange(configChangeMapper.toEntity(requestDto));
     ConfigChangeResponseDto responseDto = configChangeMapper.toDto(savedChange);
 
-    return ResponseEntity.created(buildUri(savedChange)).body(responseDto);
-  }
-
-  private URI buildUri(ConfigChange configChange) {
-    return ServletUriComponentsBuilder
+    return ResponseEntity.created(ServletUriComponentsBuilder
         .fromCurrentRequest()
         .path("/{id}")
-        .buildAndExpand(configChange.getId())
-        .toUri();
+        .buildAndExpand(savedChange.getId())
+        .toUri()
+    ).body(responseDto);
   }
 
   /**
@@ -94,8 +88,8 @@ public class ConfigController {
    */
   @GetMapping("/{id}")
   public ResponseEntity<ConfigChangeResponseDto> getConfigChangeById(@PathVariable String id) {
-    ConfigChange configChange = configChangeService.getConfigChangeById(id);
-    return ResponseEntity.ok(configChangeMapper.toDto(configChange));
+
+    return ResponseEntity.ok(configChangeMapper.toDto(configChangeService.getConfigChangeById(id)));
   }
 
   /**
@@ -121,11 +115,10 @@ public class ConfigController {
   @GetMapping
   public ResponseEntity<List<ConfigChangeResponseDto>> listConfigChangesByFilter(
       @Parameter(description = "Filter parameters for configuration changes")
-      @ParameterObject FilterDto filter) {
+      @ParameterObject ConfigChangeFilterDto filter) {
 
-    List<ConfigChange> configChanges = configChangeService.getConfigChangesByFilter(filter);
-
-    return ResponseEntity.ok(configChanges.stream()
+    return ResponseEntity.ok(configChangeService.getConfigChangesByFilter(filter)
+        .stream()
         .map(configChangeMapper::toDto)
         .collect(Collectors.toList()));
   }

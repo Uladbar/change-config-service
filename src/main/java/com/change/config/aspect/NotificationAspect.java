@@ -2,6 +2,7 @@ package com.change.config.aspect;
 
 import com.change.config.model.ConfigChange;
 import com.change.config.service.NotificationService;
+import com.change.config.util.CorrelationIdCompletableFuture;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Component;
 public class NotificationAspect {
 
   private final NotificationService notificationService;
+  private final CorrelationIdCompletableFuture correlationIdCompletableFuture;
 
   @AfterReturning(
       pointcut = "execution(com.change.config.model.ConfigChange com.change.config.repository.ConfigChangeRepository.save(..))",
@@ -26,7 +28,7 @@ public class NotificationAspect {
     try {
       if (isShouldNotify(savedChange)) {
         log.info("Should notify about : {}", savedChange);
-        CompletableFuture.runAsync(() -> notificationService.notifyCriticalChange(savedChange));
+        correlationIdCompletableFuture.runAsync(() -> notificationService.notifyCriticalChange(savedChange));
       }
     } catch (Exception e) {
       log.error("Fail to send notification about critical update", e);

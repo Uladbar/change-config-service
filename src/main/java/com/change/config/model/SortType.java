@@ -1,9 +1,9 @@
 package com.change.config.model;
 
 /**
- * Enum representing the type of configuration change.
+ * Enum representing the type of sort options for config change.
  */
 public enum SortType {
-    TIME,    // Adding a new configuration
-    TYPE, // Updating an existing configuration
+  TIME,
+  TYPE,
 }

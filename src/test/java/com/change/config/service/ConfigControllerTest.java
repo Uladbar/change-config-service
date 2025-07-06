@@ -1,5 +1,6 @@
 package com.change.config.service;
 
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -16,15 +17,18 @@ import com.change.config.aspect.NotificationAspect;
 import com.change.config.controller.ConfigController;
 import com.change.config.dto.ConfigChangeRequestDto;
 import com.change.config.dto.ConfigChangeResponseDto;
-import com.change.config.dto.FilterDto;
+import com.change.config.dto.ConfigChangeFilterDto;
 import com.change.config.mapper.ConfigChangeMapper;
 import com.change.config.model.ConfigChange;
 import com.change.config.model.ConfigChangeType;
 import com.change.config.repository.ConfigChangeRepository;
+import com.change.config.util.CorrelationIdCompletableFuture;
+import com.change.config.util.CorrelationIdUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -43,7 +47,9 @@ import org.springframework.test.web.servlet.MockMvc;
     NotificationService.class,
     ConfigChangeMapper.class,
     ConfigChangeRepository.class,
-    NotificationAspect.class})
+    NotificationAspect.class,
+    CorrelationIdCompletableFuture.class,
+    CorrelationIdUtils.class})
 public class ConfigControllerTest {
 
   @Autowired
@@ -165,7 +171,12 @@ public class ConfigControllerTest {
     verify(configChangeRepository).save(any(ConfigChange.class));
     verify(configChangeMapper).toDto(any(ConfigChange.class));
 
-    verify(notificationService, times(1)).notifyCriticalChange(argCapture.getValue());
+    // Use Awaitility to wait for the asynchronous notification service call
+    await()
+        .atMost(5, TimeUnit.SECONDS)
+        .untilAsserted(() ->
+            verify(notificationService, times(1)).notifyCriticalChange(argCapture.getValue())
+        );
   }
 
 
@@ -234,22 +245,23 @@ public class ConfigControllerTest {
 
   @ParameterizedTest
   @MethodSource("getFilterParametersArguments")
-  public void getConfigChanges(FilterDto filterDto, List<ConfigChange> allChanges, List<ConfigChange> expectedResult) throws Exception {
+  public void getConfigChanges(ConfigChangeFilterDto filterDto, List<ConfigChange> allChanges, List<ConfigChange> expectedResult)
+      throws Exception {
 
     Mockito.when(configChangeRepository.findAll()).thenReturn(allChanges);
     var requestBuilder = get("/api/configs");
     Optional.of(filterDto)
-        .map(FilterDto::getStartTime)
+        .map(ConfigChangeFilterDto::getStartTime)
         .map(LocalDateTime::toString)
         .ifPresent(value -> requestBuilder.param("startTime", value));
 
     Optional.of(filterDto)
-        .map(FilterDto::getEndTime)
+        .map(ConfigChangeFilterDto::getEndTime)
         .map(LocalDateTime::toString)
         .ifPresent(value -> requestBuilder.param("endTime", value));
 
     Optional.of(filterDto)
-        .map(FilterDto::getType)
+        .map(ConfigChangeFilterDto::getType)
         .map(Enum::name)
         .ifPresent(value -> requestBuilder.param("type", value));
 
@@ -282,22 +294,24 @@ public class ConfigControllerTest {
 
     return Stream.of(
         //no filters
-        Arguments.of(FilterDto.builder().build(), allChanges, allChanges),
+        Arguments.of(ConfigChangeFilterDto.builder().build(), allChanges, allChanges),
         // filter by type
-        Arguments.of(FilterDto.builder().type(ConfigChangeType.ADD).build(), allChanges, List.of(changeB)),
+        Arguments.of(ConfigChangeFilterDto.builder().type(ConfigChangeType.ADD).build(), allChanges, List.of(changeB)),
         //filter by start date
-        Arguments.of(FilterDto.builder().startTime(LocalDateTime.now().minusDays(4)).build(), allChanges, List.of(changeA, changeC)),
+        Arguments.of(
+            ConfigChangeFilterDto.builder().startTime(LocalDateTime.now().minusDays(4)).build(), allChanges, List.of(changeA, changeC)),
         //filter by end date
-        Arguments.of(FilterDto.builder().endTime(LocalDateTime.now().minusDays(4)).build(), allChanges, List.of(changeB, changeD)),
+        Arguments.of(ConfigChangeFilterDto.builder().endTime(LocalDateTime.now().minusDays(4)).build(), allChanges,
+            List.of(changeB, changeD)),
         //filter by date range
-        Arguments.of(FilterDto.builder()
+        Arguments.of(ConfigChangeFilterDto.builder()
                 .startTime(LocalDateTime.now().minusDays(4))
                 .endTime(LocalDateTime.now().minusDays(2))
                 .build(),
             allChanges, List.of(changeA)),
 
         //filter by all params
-        Arguments.of(FilterDto.builder()
+        Arguments.of(ConfigChangeFilterDto.builder()
                 .startTime(LocalDateTime.now().minusDays(4))
                 .endTime(LocalDateTime.now().minusDays(2))
                 .type(ConfigChangeType.ADD)
@@ -308,7 +322,7 @@ public class ConfigControllerTest {
   }
 
   @Test
-  public void getConfigChangeById() throws Exception {
+  public void getConfigChangeById_success() throws Exception {
     var id = "unique id";
     var expected = ConfigChangeResponseDto.builder()
         .id(id)
@@ -336,6 +350,19 @@ public class ConfigControllerTest {
         .andExpect(content().json(objectMapper.writeValueAsString(expected)));
 
     verify(configChangeMapper).toDto(any(ConfigChange.class));
+    verify(configChangeService).getConfigChangeById(id);
+  }
+
+
+  @Test
+  public void getConfigChangeById_notFound() throws Exception {
+    var id = "unique id";
+    Mockito.when(configChangeRepository.findById(id)).thenReturn(null);
+    mockMvc.perform(get("/api/configs/" + id)
+            .contentType(MediaType.APPLICATION_JSON)
+        )
+        .andExpect(status().isNotFound());
+
     verify(configChangeService).getConfigChangeById(id);
   }
 }
